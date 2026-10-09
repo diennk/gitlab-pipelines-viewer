@@ -1,7 +1,7 @@
 import { Fragment, memo, useState } from 'react'
 import { durationMs } from '../api/gitlab'
 import { PipelineGraph, STATUS_STYLE } from './PipelineGraph'
-import { pipelineKey, type EffectiveStatus, type PipelineDetail, type PipelineRow } from '../types/gitlab'
+import { pipelineKey, type EffectiveStatus, type GitLabUser, type PipelineDetail, type PipelineRow } from '../types/gitlab'
 
 export type SortKey = 'project' | 'id' | 'status' | 'created' | 'updated' | 'duration'
 export interface Sort {
@@ -40,6 +40,7 @@ const COLS: [string, SortKey | null][] = [
   ['Branch / Tag', null],
   ['Status', 'status'],
   ['Commit', null],
+  ['User', null],
   ['Created', 'created'],
   ['Updated', 'updated'],
   ['Duration', 'duration'],
@@ -49,6 +50,7 @@ const COLS: [string, SortKey | null][] = [
 interface Props {
   rows: PipelineRow[]
   jobs: Record<string, PipelineDetail>
+  users: Record<string, GitLabUser>
   /** Called when a row is expanded, to (re)load its graph data. */
   onExpand: (p: PipelineRow) => void
   statuses: Record<string, EffectiveStatus>
@@ -58,7 +60,7 @@ interface Props {
 
 const link = 'text-sky-400 hover:underline'
 
-function PipelineTableBase({ rows, jobs, statuses, sort, onSort, onExpand }: Props) {
+function PipelineTableBase({ rows, jobs, users, statuses, sort, onSort, onExpand }: Props) {
   const [open, setOpen] = useState<Set<string>>(new Set())
   const toggle = (p: PipelineRow) => {
     const k = pipelineKey(p)
@@ -107,6 +109,13 @@ function PipelineTableBase({ rows, jobs, statuses, sort, onSort, onExpand }: Pro
               <td className="px-3 py-2 font-mono text-xs">{p.ref}</td>
               <td className="px-3 py-2"><StatusBadge status={statuses[pipelineKey(p)] ?? p.status} title={`Pipeline: ${p.status}`} /></td>
               <td className="px-3 py-2 font-mono text-xs text-slate-400">{p.sha.slice(0, 7)}</td>
+              <td className="px-3 py-2 text-slate-300">
+                {users[pipelineKey(p)] ? (
+                  <a className={link} href={users[pipelineKey(p)].web_url} target="_blank" rel="noopener noreferrer" title={`@${users[pipelineKey(p)].username}`}>
+                    {users[pipelineKey(p)].name}
+                  </a>
+                ) : '-'}
+              </td>
               <td className="px-3 py-2 text-slate-400">{fmtTime(p.created_at)}</td>
               <td className="px-3 py-2 text-slate-400">{fmtTime(p.updated_at)}</td>
               <td className="px-3 py-2 text-slate-300">{fmtDuration(durationMs(p))}</td>

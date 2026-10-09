@@ -160,7 +160,7 @@ export default function App() {
       )}
 
       <PipelineFilters filters={filters} projects={gl.projects} branches={branches} onChange={setFilters} />
-      <PipelineTable rows={rows} jobs={details} statuses={statuses} onExpand={gl.loadDetail} sort={sort} onSort={onSort} />
+      <PipelineTable rows={rows} jobs={details} users={gl.users} statuses={statuses} onExpand={gl.loadDetail} sort={sort} onSort={onSort} />
 
       <footer className="pb-6 text-center text-xs text-slate-500">
         {loaded} / {gl.projects.length} projects · showing {rows.length} of {pipelines.length} pipelines

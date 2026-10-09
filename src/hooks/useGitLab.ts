@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { GitLabError, getAllPipelines, getAllProjects, getPipelineDetails, getCurrentUser, normalizeUrl } from '../api/gitlab'
+import { GitLabError, getAllPipelines, getAllProjects, getPipelineDetails, getPipelineUsers, getCurrentUser, normalizeUrl } from '../api/gitlab'
 import type { GitLabConfig, PipelineDetail, GitLabProject, GitLabUser, PipelineRow, ProjectError } from '../types/gitlab'
 
 const STORAGE_KEY = 'gitlab-pipeline-dashboard:config'
@@ -24,6 +24,7 @@ export function useGitLab() {
   const [pipelines, setPipelines] = useState<PipelineRow[]>([])
   const [projectErrors, setProjectErrors] = useState<ProjectError[]>([])
   const [jobs, setJobs] = useState<Record<string, PipelineDetail>>({})
+  const [users, setUsers] = useState<Record<string, GitLabUser>>({})
   const [loading, setLoading] = useState<'projects' | 'pipelines' | 'jobs' | null>(null)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -36,6 +37,7 @@ export function useGitLab() {
   const configRef = useRef<GitLabConfig | null>(null)
   const projectsRef = useRef<GitLabProject[]>([])
   const sinceRef = useRef(0)
+  const usersRef = useRef<Record<string, GitLabUser>>({}) // a pipeline's user never changes: fetch once
 
   /** Load pipelines (and projects when `discover`). Old data stays visible until new data arrives. */
   const run = useCallback(async (discover: boolean) => {
@@ -70,6 +72,11 @@ export function useGitLab() {
       })
       if (ac.signal.aborted) return
       setJobs(j)
+      // ponytail: one request per new pipeline; first history load can be slow on big instances
+      const u = await getPipelineUsers(cfg, r.pipelines, usersRef.current, ac.signal)
+      if (ac.signal.aborted) return
+      usersRef.current = { ...usersRef.current, ...u }
+      setUsers(usersRef.current)
     } catch (e) {
       if (ac.signal.aborted) return
       setError(msg(e))
@@ -84,6 +91,7 @@ export function useGitLab() {
     abortRef.current?.abort()
     configRef.current = null
     projectsRef.current = []
+    usersRef.current = {}
     try {
       localStorage.removeItem(STORAGE_KEY)
     } catch {
@@ -97,6 +105,7 @@ export function useGitLab() {
     setPipelines([])
     setProjectErrors([])
     setJobs({})
+    setUsers({})
     setLoading(null)
     setProgress(null)
     setError(null)
@@ -188,7 +197,7 @@ export function useGitLab() {
   return {
     loadDetail,
     sinceHours, setRange,
-    connected, connecting, config, user, projects, pipelines, projectErrors, jobs,
+    connected, connecting, config, user, projects, pipelines, projectErrors, jobs, users,
     loading, progress, error, lastUpdated, autoMs, setAutoMs, secondsLeft,
     connect, disconnect,
     refresh: () => run(false),

@@ -189,6 +189,30 @@ export async function getAllPipelines(
   return { pipelines, errors }
 }
 
+/**
+ * Who triggered each pipeline (the list endpoint has no `user`, so one GET per pipeline).
+ * Pipelines already in `known` are skipped; a failed lookup is just left out.
+ */
+export async function getPipelineUsers(
+  cfg: GitLabConfig,
+  pipelines: GitLabPipeline[],
+  known: Record<string, GitLabUser>,
+  signal?: AbortSignal,
+): Promise<Record<string, GitLabUser>> {
+  const out: Record<string, GitLabUser> = {}
+  const todo = pipelines.filter((p) => !known[pipelineKey(p)])
+  await runPool(todo, CONCURRENCY, async (p) => {
+    if (signal?.aborted) return
+    try {
+      const { data } = await request<{ user: GitLabUser | null }>(cfg, `/projects/${p.project_id}/pipelines/${p.id}`, signal)
+      if (data.user) out[pipelineKey(p)] = data.user
+    } catch {
+      /* column shows "-" */
+    }
+  })
+  return out
+}
+
 /** Jobs of a pipeline (first 100). */
 export async function getPipelineJobs(
   cfg: GitLabConfig,
